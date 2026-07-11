@@ -1,12 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { Waypoints, ArrowRight, Sparkles, Target } from 'lucide-react'
-import { WARM_PATHS } from '../data/mock'
-import { Card, Avatar, Pill } from '../components/ui'
+import { useWarmPaths } from '../lib/queries'
+import { Card, Avatar, Pill, Loading, ErrorState } from '../components/ui'
 
 const STRENGTH_TONE = { strong: 'green', medium: 'amber', thin: 'red' } as const
 
 export function Relationships() {
   const navigate = useNavigate()
+  const { data: warmPaths, isLoading, error } = useWarmPaths()
+
+  if (isLoading) return <Loading />
+  if (error) return <ErrorState error={error} />
 
   return (
     <div>
@@ -23,10 +27,9 @@ export function Relationships() {
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {WARM_PATHS.map((w, i) => (
+        {warmPaths?.map((w, i) => (
           <Card key={i} className="p-4" onClick={w.dealId ? () => navigate(`/deal/${w.dealId}`) : undefined}>
             <div className="flex items-center gap-3">
-              {/* target */}
               <div className="flex items-center gap-2.5 w-56 shrink-0">
                 <div className="rounded-md flex items-center justify-center bg-[var(--accent-soft)]" style={{ width: 32, height: 32 }}>
                   <Target size={15} className="text-accent" />
@@ -37,7 +40,6 @@ export function Relationships() {
                 </div>
               </div>
 
-              {/* connector */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div className="flex-1 flex items-center gap-1.5">
                   <div className="h-px flex-1" style={{ background: 'var(--border-emphasis)' }} />
@@ -46,7 +48,6 @@ export function Relationships() {
                 </div>
               </div>
 
-              {/* via */}
               <div className="flex items-center gap-2.5 w-56 shrink-0">
                 <Avatar name={w.via} size={30} />
                 <div className="min-w-0">

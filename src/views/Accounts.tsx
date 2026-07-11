@@ -1,35 +1,46 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, ArrowRight, Sparkles } from 'lucide-react'
-import { DEALS } from '../data/mock'
-import { formatCurrency, relDate } from '../lib/format'
-import { Card, Pill, PropensityMeter, StageDot } from '../components/ui'
+import { useDeals } from '../lib/queries'
+import { formatCurrency } from '../lib/format'
+import { Card, PropensityMeter, StageDot, Loading, ErrorState } from '../components/ui'
+import type { Deal } from '../data/types'
 
-// Account-level intent proxies — the "target on intel, not name/revenue" ask.
-const INTEL: Record<string, string[]> = {
-  "L'Oréal": ['MSA extended to Dec', 'New RTM buying centre (James)', 'Skin-care AI selling push'],
-  Diageo: ['Investing in commercial-AI capability', 'New CDO ex-Wonderless', 'Agency-held media data blocker'],
-  'Niagara Bottling': ['Full RFP suite issued', 'Research-led intro (self-qualified)'],
-  Regeneron: ['Cold ~2yr, now warmed', 'Semantic-layer / KG modernization'],
-  Otsuka: ['Active MMX RFP', 'Commercial NBA interest'],
-  PepsiCo: ['Preferred-vendor wall', 'Cold motion not converting'],
-  AstraZeneca: ['Early — current-state analysis', 'Low intel captured'],
-  Grubhub: ['Rare cold logo this year', 'Apollo campaign traction'],
+// Intent signals are derived from the live deal data — not a hardcoded map —
+// so nothing account-specific is baked into the repo.
+function signalsFor(deals: Deal[]): string[] {
+  const out: string[] = []
+  for (const d of deals) {
+    for (const f of d.flags) if (f.severity !== 'low') out.push(f.label)
+    if (d.intent.value) out.push(d.intent.value.split('—')[0].trim())
+  }
+  return Array.from(new Set(out)).slice(0, 3)
 }
 
 export function Accounts() {
   const navigate = useNavigate()
+  const { data: deals, isLoading, error } = useDeals()
 
-  const accounts = Array.from(new Set(DEALS.map((d) => d.account))).map((name) => {
-    const deals = DEALS.filter((d) => d.account === name)
-    return {
-      name,
-      vertical: deals[0].vertical,
-      tcv: deals.reduce((s, d) => s + d.tcv, 0),
-      deals,
-      bestProp: Math.max(...deals.map((d) => d.propensity)),
-      lastTouch: deals.map((d) => d.lastTouch).sort().reverse()[0],
-    }
-  }).sort((a, b) => b.tcv - a.tcv)
+  const accounts = useMemo(() => {
+    if (!deals) return []
+    const names = Array.from(new Set(deals.map((d) => d.account)))
+    return names
+      .map((name) => {
+        const list = deals.filter((d) => d.account === name)
+        return {
+          name,
+          vertical: list[0].vertical,
+          tcv: list.reduce((s, d) => s + d.tcv, 0),
+          deals: list,
+          bestProp: Math.max(...list.map((d) => d.propensity)),
+          signals: signalsFor(list),
+        }
+      })
+      .sort((a, b) => b.tcv - a.tcv)
+  }, [deals])
+
+  if (isLoading) return <Loading />
+  if (error) return <ErrorState error={error} />
 
   return (
     <div>
@@ -57,9 +68,9 @@ export function Accounts() {
               </div>
             </div>
 
-            {INTEL[a.name] && (
+            {a.signals.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {INTEL[a.name].map((sig) => (
+                {a.signals.map((sig) => (
                   <span key={sig} className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] text-accent px-2 py-0.5 text-[11px]">
                     <Sparkles size={9} /> {sig}
                   </span>

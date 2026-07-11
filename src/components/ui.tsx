@@ -1,5 +1,24 @@
 import type { ReactNode } from 'react'
+import { Loader2 } from 'lucide-react'
 import { initials } from '../lib/format'
+
+// ── Loading / error / empty states ───────────────────────────────────────────
+export function Loading({ label = 'Loading pipeline…' }: { label?: string }) {
+  return (
+    <div className="flex items-center gap-2 text-tertiary text-[13px] py-16 justify-center">
+      <Loader2 size={16} className="animate-spin" /> {label}
+    </div>
+  )
+}
+
+export function ErrorState({ error }: { error: unknown }) {
+  const msg = error instanceof Error ? error.message : String(error)
+  return (
+    <div className="text-[13px] text-red-text bg-red-bg rounded-lg px-4 py-3">
+      Couldn’t load data: {msg}
+    </div>
+  )
+}
 
 // ── Card ────────────────────────────────────────────────────────────────────
 export function Card({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {

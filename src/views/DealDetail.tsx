@@ -2,33 +2,36 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, Linkedin, StickyNote, GitBranch, Sparkles, Check, Clock,
-  ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp,
+  ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp, Loader2,
 } from 'lucide-react'
-import { dealById } from '../data/mock'
-import { formatCurrency, relDate, shortDate, pct } from '../lib/format'
-import { Card, Pill, Avatar, StageDot, PropensityMeter } from '../components/ui'
+import { useDeal, useAcceptField, useMoveToLatent, useReviveDeal } from '../lib/queries'
+import { formatCurrency, shortDate, pct } from '../lib/format'
+import { isClosed } from '../lib/constants'
+import { Card, Pill, Avatar, StageDot, PropensityMeter, Loading, ErrorState } from '../components/ui'
 import { ProvenanceField } from '../components/ProvenanceField'
 import type { TouchType } from '../data/types'
 
 const TOUCH_ICON: Record<TouchType, typeof Phone> = {
-  call: Phone,
-  email: Mail,
-  linkedin: Linkedin,
-  note: StickyNote,
-  stage: GitBranch,
-  relay: Sparkles,
+  call: Phone, email: Mail, linkedin: Linkedin, note: StickyNote, stage: GitBranch, relay: Sparkles,
 }
 
 export function DealDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const deal = dealById(id!)
-  const [nextAccepted, setNextAccepted] = useState(false)
+  const { deal, isLoading, error } = useDeal(id)
+  const acceptField = useAcceptField()
+  const moveToLatent = useMoveToLatent()
+  const revive = useReviveDeal()
   const [latentOpen, setLatentOpen] = useState(false)
+  const [reason, setReason] = useState('')
 
+  if (isLoading) return <Loading />
+  if (error) return <ErrorState error={error} />
   if (!deal) return <div className="text-secondary">Deal not found. <Link to="/pipeline" className="text-accent">Back to pipeline</Link></div>
 
   const touches = [...deal.touches].sort((a, b) => b.date.localeCompare(a.date))
+  const isLatentStage = ['Latent Pool', 'Disqualified'].includes(deal.stage)
+  const accept = (key: string) => acceptField.mutateAsync({ dealId: deal.id, key })
 
   return (
     <div>
@@ -36,7 +39,6 @@ export function DealDetail() {
         <ArrowLeft size={14} /> Back
       </button>
 
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-5">
         <div>
           <div className="flex items-center gap-2">
@@ -48,9 +50,7 @@ export function DealDetail() {
         </div>
         <div className="text-right">
           <div className="num text-[22px] font-medium">{formatCurrency(deal.tcv)}</div>
-          <div className="flex items-center gap-1.5 justify-end mt-1 text-[12px]">
-            <StageDot stage={deal.stage} /> {deal.stage}
-          </div>
+          <div className="flex items-center gap-1.5 justify-end mt-1 text-[12px]"><StageDot stage={deal.stage} /> {deal.stage}</div>
         </div>
       </div>
 
@@ -61,25 +61,18 @@ export function DealDetail() {
           <Card className="p-4">
             <div className="flex items-center gap-1.5 mb-2 text-[11px] text-secondary">
               <ArrowRight size={13} className="text-accent" /> Next step
-              {deal.nextStep.status === 'suggested' && !nextAccepted && <Pill tone="accent" icon={<Sparkles size={10} />}>Relay drafted</Pill>}
+              {deal.nextStep.status === 'suggested' && <Pill tone="accent" icon={<Sparkles size={10} />}>Relay drafted</Pill>}
             </div>
             {deal.nextStep.status === 'empty' ? (
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[13px] text-amber-text">
-                  No next step — this is the #1 leak. Relay can draft one from the transcript.
-                </div>
-                <button className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-accent text-white px-3 py-1.5 text-[12px] hover:brightness-110">
-                  <Sparkles size={13} /> Draft next step
-                </button>
+              <div className="text-[13px] text-amber-text">
+                No next step — this is the #1 leak. Relay drafts one from the next captured call; log one via “Log a call”.
               </div>
             ) : (
               <>
                 <div className="text-[14px] leading-snug">{deal.nextStep.value}</div>
                 <div className="flex items-center gap-3 mt-2.5">
                   {deal.nextStepDue && (
-                    <span className="inline-flex items-center gap-1 text-[12px] text-secondary">
-                      <Clock size={12} /> due {shortDate(deal.nextStepDue)}
-                    </span>
+                    <span className="inline-flex items-center gap-1 text-[12px] text-secondary"><Clock size={12} /> due {shortDate(deal.nextStepDue)}</span>
                   )}
                   {deal.nextStepOwner && (
                     <span className="inline-flex items-center gap-1.5 text-[12px] text-secondary">
@@ -87,13 +80,17 @@ export function DealDetail() {
                     </span>
                   )}
                   <div className="ml-auto">
-                    {nextAccepted ? (
+                    {deal.nextStep.status === 'confirmed' ? (
                       <span className="inline-flex items-center gap-1 text-[12px] text-green-text"><Check size={13} /> confirmed</span>
-                    ) : deal.nextStep.status === 'suggested' ? (
-                      <button onClick={() => setNextAccepted(true)} className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] text-accent px-2.5 py-1 text-[12px] hover:brightness-95">
-                        <Check size={12} /> Confirm
+                    ) : (
+                      <button
+                        onClick={() => accept('next_step')}
+                        disabled={acceptField.isPending}
+                        className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] text-accent px-2.5 py-1 text-[12px] hover:brightness-95 disabled:opacity-60"
+                      >
+                        {acceptField.isPending && acceptField.variables?.key === 'next_step' ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Confirm
                       </button>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               </>
@@ -106,9 +103,9 @@ export function DealDetail() {
               <Sparkles size={13} className="text-accent" /> Relay-maintained fields
               <span className="text-tertiary">· click a source to see the quote</span>
             </div>
-            <ProvenanceField label="Problem statement" field={deal.problemStatement} />
-            <ProvenanceField label="Buying intent" field={deal.intent} />
-            <ProvenanceField label="Budget identified" field={deal.budget} />
+            <ProvenanceField label="Problem statement" field={deal.problemStatement} onAccept={() => accept('problem_statement')} />
+            <ProvenanceField label="Buying intent" field={deal.intent} onAccept={() => accept('intent')} />
+            <ProvenanceField label="Budget identified" field={deal.budget} onAccept={() => accept('budget')} />
           </Card>
 
           {/* Contacts */}
@@ -129,9 +126,7 @@ export function DealDetail() {
                         {c.seniority.value && <span className="text-tertiary"> · {c.seniority.value}</span>}
                       </div>
                       {c.warmPath && (
-                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-accent">
-                          <Waypoints size={11} /> {c.warmPath}
-                        </div>
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-accent"><Waypoints size={11} /> {c.warmPath}</div>
                       )}
                     </div>
                   </div>
@@ -197,12 +192,11 @@ export function DealDetail() {
               </div>
             ))}
             <div className="hairline-t mt-1.5 pt-1.5 flex items-center justify-between text-[12px] font-medium">
-              <span>Propensity</span>
-              <span className="num">{pct(deal.propensity)}</span>
+              <span>Propensity</span><span className="num">{pct(deal.propensity)}</span>
             </div>
           </Card>
 
-          {/* Owner map */}
+          {/* Ownership */}
           <Card className="p-4">
             <div className="text-[11px] text-secondary mb-2.5">Ownership</div>
             <OwnerRow label="Deal owner" name={deal.seller} tone="accent" />
@@ -212,9 +206,7 @@ export function DealDetail() {
 
           {/* Follow-up composer */}
           <Card className="p-4">
-            <div className="flex items-center gap-1.5 mb-2 text-[11px] text-secondary">
-              <Send size={12} className="text-accent" /> Rich follow-up
-            </div>
+            <div className="flex items-center gap-1.5 mb-2 text-[11px] text-secondary"><Send size={12} className="text-accent" /> Rich follow-up</div>
             <p className="text-[12px] text-secondary leading-snug mb-2.5">
               Relay assembles case studies + M1 intel + a custom demo — not a one-line “want to talk?” nudge.
             </p>
@@ -224,48 +216,62 @@ export function DealDetail() {
           </Card>
 
           {/* Latent gate */}
-          {!['Latent Pool', 'Disqualified', 'Won', 'Lost'].includes(deal.stage) ? (
-            <button
-              onClick={() => setLatentOpen((o) => !o)}
-              className="text-[12px] text-tertiary hover:text-secondary text-left inline-flex items-center gap-1.5"
-            >
-              <ShieldQuestion size={13} /> Move to latent pool…
-            </button>
-          ) : (
+          {isLatentStage ? (
             <Card className="p-4">
-              <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-amber-text">
-                <ShieldQuestion size={13} /> Latent-pool review
-              </div>
+              <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-amber-text"><ShieldQuestion size={13} /> Latent-pool review</div>
               <p className="text-[12px] text-secondary leading-snug">
-                Relay flags this as thin follow-up. {deal.latentReason && `Reason on file: “${deal.latentReason}.”`} Needs SDR sign-off before it stays latent.
+                Relay flags this as thin follow-up. {deal.latentReason && `Reason on file: “${deal.latentReason}.”`} Needs sign-off before it stays latent.
               </p>
               <div className="flex gap-2 mt-2.5">
-                <button className="flex-1 rounded-md bg-[var(--accent-soft)] text-accent px-2 py-1.5 text-[12px] inline-flex items-center justify-center gap-1">
-                  <TrendingUp size={12} /> Revive
+                <button
+                  onClick={() => revive.mutate({ dealId: deal.id })}
+                  disabled={revive.isPending}
+                  className="flex-1 rounded-md bg-[var(--accent-soft)] text-accent px-2 py-1.5 text-[12px] inline-flex items-center justify-center gap-1 disabled:opacity-60"
+                >
+                  {revive.isPending ? <Loader2 size={12} className="animate-spin" /> : <TrendingUp size={12} />} Revive
                 </button>
-                <button className="flex-1 rounded-md hairline px-2 py-1.5 text-[12px] text-secondary inline-flex items-center justify-center gap-1">
-                  <Check size={12} /> Confirm latent
-                </button>
+                <span className="flex-1 rounded-md hairline px-2 py-1.5 text-[12px] text-secondary inline-flex items-center justify-center gap-1">
+                  <Check size={12} /> Confirmed latent
+                </span>
               </div>
             </Card>
-          )}
-
-          {latentOpen && (
-            <Card className="p-4 fade-up">
-              <div className="text-[11px] text-secondary mb-1.5">Why is this going latent?</div>
-              <p className="text-[12px] text-amber-text mb-2">
-                Relay counted {deal.touches.length} touches. The sign-off rule: reason + last touchpoint required, SDR validates.
-              </p>
-              <textarea
-                placeholder="Reason (required)…"
-                className="w-full hairline rounded-md p-2 text-[12px] bg-card outline-none resize-none"
-                rows={2}
-              />
-              <button className="mt-2 w-full rounded-md bg-surface text-secondary px-2 py-1.5 text-[12px]">
-                Request Jathin's sign-off
+          ) : !isClosed(deal.stage) ? (
+            latentOpen ? (
+              <Card className="p-4 fade-up">
+                <div className="text-[11px] text-secondary mb-1.5">Why is this going latent?</div>
+                <p className="text-[12px] text-amber-text mb-2">
+                  Relay counted {deal.touches.length} touches. Sign-off rule: a reason is required before a lead the team worked is written off.
+                </p>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Reason (required)…"
+                  className="w-full hairline rounded-md p-2 text-[12px] bg-card outline-none resize-none"
+                  rows={2}
+                />
+                {moveToLatent.isError && (
+                  <div className="mt-1.5 text-[11px] text-red-text">{(moveToLatent.error as Error).message}</div>
+                )}
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => moveToLatent.mutate({ dealId: deal.id, reason }, { onSuccess: () => { setLatentOpen(false); setReason('') } })}
+                    disabled={moveToLatent.isPending || !reason.trim()}
+                    className="flex-1 rounded-md bg-surface text-secondary px-2 py-1.5 text-[12px] inline-flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    {moveToLatent.isPending ? <Loader2 size={12} className="animate-spin" /> : <ShieldQuestion size={12} />} Move to latent
+                  </button>
+                  <button onClick={() => { setLatentOpen(false); setReason('') }} className="rounded-md hairline px-2.5 py-1.5 text-[12px] text-secondary">Cancel</button>
+                </div>
+              </Card>
+            ) : (
+              <button
+                onClick={() => setLatentOpen(true)}
+                className="text-[12px] text-tertiary hover:text-secondary text-left inline-flex items-center gap-1.5"
+              >
+                <ShieldQuestion size={13} /> Move to latent pool…
               </button>
-            </Card>
-          )}
+            )
+          ) : null}
         </div>
       </div>
     </div>

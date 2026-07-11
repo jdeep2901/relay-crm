@@ -4,9 +4,13 @@ export function formatCurrency(n: number): string {
   return `$${(n / 1_000_000).toFixed(2)}M`
 }
 
+// The pipeline's "today" anchor. Data is seeded relative to this date.
+export const TODAY_ISO = '2026-07-11'
+
 export function daysAgo(iso: string): number {
+  if (!iso) return 0
   const then = new Date(iso + 'T00:00:00').getTime()
-  const now = new Date('2026-07-10T00:00:00').getTime()
+  const now = new Date(TODAY_ISO + 'T00:00:00').getTime()
   return Math.round((now - then) / 86_400_000)
 }
 

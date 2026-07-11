@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Sparkles, Pencil, CircleAlert } from 'lucide-react'
+import { Check, Sparkles, CircleAlert, Loader2 } from 'lucide-react'
 import type { ExtractedField, Owner } from '../data/types'
 
 const OWNER_LABEL: Record<Owner, string> = {
@@ -9,13 +9,27 @@ const OWNER_LABEL: Record<Owner, string> = {
 }
 
 // The heart of Relay's trust model: a field Relay filled from a source.
-// Human confirms (one click) or edits — never types from scratch.
-export function ProvenanceField({ label, field }: { label: string; field: ExtractedField }) {
-  const [status, setStatus] = useState(field.status)
+// Human confirms (one click, persisted) or inspects the quote — never types from scratch.
+export function ProvenanceField({
+  label,
+  field,
+  onAccept,
+}: {
+  label: string
+  field: ExtractedField
+  onAccept?: () => Promise<void> | void
+}) {
   const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  const empty = status === 'empty' || field.value == null
-  const suggested = status === 'suggested'
+  const empty = field.status === 'empty' || field.value == null
+  const suggested = field.status === 'suggested'
+
+  async function accept() {
+    if (!onAccept) return
+    setBusy(true)
+    try { await onAccept() } finally { setBusy(false) }
+  }
 
   return (
     <div className="py-2.5 hairline-b last:border-b-0">
@@ -53,22 +67,18 @@ export function ProvenanceField({ label, field }: { label: string; field: Extrac
 
         {!empty && (
           <div className="flex items-center gap-1 shrink-0">
-            {status === 'confirmed' ? (
+            {field.status === 'confirmed' ? (
               <span className="inline-flex items-center gap-1 text-[11px] text-green-text">
                 <Check size={12} /> confirmed
               </span>
-            ) : suggested ? (
-              <>
-                <button
-                  onClick={() => setStatus('confirmed')}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] text-accent px-2 py-1 text-[11px] hover:brightness-95"
-                >
-                  <Check size={12} /> Accept
-                </button>
-                <button className="rounded-md hairline px-1.5 py-1 text-secondary hover:bg-hover">
-                  <Pencil size={12} />
-                </button>
-              </>
+            ) : suggested && onAccept ? (
+              <button
+                onClick={accept}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] text-accent px-2 py-1 text-[11px] hover:brightness-95 disabled:opacity-60"
+              >
+                {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Accept
+              </button>
             ) : null}
           </div>
         )}

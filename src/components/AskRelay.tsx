@@ -1,100 +1,124 @@
 import { useEffect, useRef, useState } from 'react'
 import { Sparkles, CornerDownLeft, X, Zap } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useDeals, useWarmPaths } from '../lib/queries'
+import { formatCurrency, pct } from '../lib/format'
+import { isClosed } from '../lib/constants'
+import type { Deal, WarmPath } from '../data/types'
 
 type Answer = { body: string; chips?: { label: string; to?: string }[] }
 
-// Scripted responses grounded in the real pipeline. In phase 2 this becomes a
-// Supabase Edge Function over the deal graph (same pattern as chat-analyst).
-const SCRIPTED: { q: string; a: Answer }[] = [
-  {
-    q: "what's stalled in diageo?",
-    a: {
-      body:
-        "Diageo has 3 threads losing momentum:\n\n• Chad — MMM (good Jul 9 call, but no next step logged). Relay drafted one.\n• Michael Ditter — replied only to decline; no leadership warm-path.\n• Finance/commercial-performance thread — cold after a strong 2nd call.\n\nThe pattern is a warm-path gap, not a content gap. Route to the new CDO (ex-Wonderless) via Ryan.",
-      chips: [
-        { label: 'Open Chad thread', to: '/deal/diageo-chad-mmm' },
-        { label: 'See warm paths', to: '/relationships' },
-      ],
-    },
-  },
-  {
-    q: 'draft the l’oréal follow-up',
-    a: {
-      body:
-        "Drafted from the Jun 30 momentum call + Atishay's email:\n\n“James — great to connect via Atishay. To make the NY session concrete, I'll bring a Sales Rep GPT walkthrough tuned to skin-care selling (the pharma/derm referral model you liked) and a short art-of-the-possible for your boss's team. Tue or Wed afternoon — which works?”\n\nRicher than a one-line nudge: it carries the use case + the workshop hook.",
-      chips: [{ label: 'Open L’Oréal deal', to: '/deal/loreal-salesrep-gpt' }],
-    },
-  },
-  {
-    q: 'which deals have no next step?',
-    a: {
-      body:
-        "4 open threads have no next action — the #1 leak from your review (“calls feel good but produce no next step”):\n\n• Diageo · Chad (Qualification) — Relay drafted one, awaiting accept\n• AstraZeneca · current-state (Qualification, 22d stale)\n• PepsiCo (Latent — needs sign-off, not silent drop)\n\nRelay can draft all 3 from their transcripts now.",
-      chips: [{ label: 'Go to Today', to: '/' }],
-    },
-  },
-  {
-    q: 'who can warm-intro michael ditter?',
-    a: {
-      body:
-        "No direct MathCo-leadership path to Ditter today. Best route:\n\n1. New Diageo CDO (ex-Wonderless) → via Ryan (routing in progress)\n2. Shreya / Piyush have a thin connect — reinforce, don't lead with it\n\nCold outreach to Ditter has a ~0% base rate here (he only replied to decline). Prioritise the CDO relay.",
-      chips: [{ label: 'Open relationships', to: '/relationships' }],
-    },
-  },
-  {
-    q: 'why is niagara at 74%?',
-    a: {
-      body:
-        "Niagara propensity = 74%.\n\nStage baseline (Proposal, 2yr history): 55%\n+12% budget identified (RFP-backed)\n+7% client self-qualified (pitched themselves to MathCo)\n\nNo per-deal subjectivity — same formula Cortex ingests as one column.",
-      chips: [{ label: 'Open Niagara deal', to: '/deal/niagara-rfp' }],
-    },
-  },
+const SUGGESTIONS = [
+  "what's stalled?",
+  'which deals have no next step?',
+  'highest-propensity deals',
+  'show me the warm paths',
+  'explain a propensity score',
 ]
 
-const SUGGESTIONS = SCRIPTED.map((s) => s.q)
+// Relay answers over the live pipeline (react-query cache). No account specifics
+// are hardcoded — everything is computed from the current data.
+function answer(query: string, deals: Deal[], warmPaths: WarmPath[]): Answer {
+  const q = query.toLowerCase()
+  const open = deals.filter((d) => !isClosed(d.stage))
+
+  // Named-account lookup
+  const named = deals.find((d) => q.includes(d.account.toLowerCase()))
+  if (named && (q.includes('propensity') || q.includes('%') || q.includes('why'))) {
+    const lines = [
+      `${named.account} · ${named.name} — propensity ${pct(named.propensity)}.`,
+      ``,
+      `${named.stage} baseline (2yr history): ${pct(named.propensityBase)}`,
+      ...named.propensityCriteria.map((c) => `${c.delta >= 0 ? '+' : ''}${Math.round(c.delta * 100)}% ${c.label}${c.met ? '' : ' (not met)'}`),
+      ``,
+      `Same formula Cortex ingests as one column — no per-deal subjectivity.`,
+    ]
+    return { body: lines.join('\n'), chips: [{ label: `Open ${named.account}`, to: `/deal/${named.id}` }] }
+  }
+  if (named) {
+    const list = deals.filter((d) => d.account === named.account)
+    return {
+      body: `${named.account} — ${list.length} thread${list.length > 1 ? 's' : ''}, ${formatCurrency(list.reduce((s, d) => s + d.tcv, 0))} open.\n\n` +
+        list.map((d) => `• ${d.name} (${d.stage}, ${pct(d.propensity)})${d.nextStep.status === 'empty' ? ' — no next step' : ''}`).join('\n'),
+      chips: [{ label: `Open ${named.account}`, to: `/deal/${named.id}` }],
+    }
+  }
+
+  if (q.includes('stall') || q.includes('risk') || q.includes('attention')) {
+    const flagged = deals.flatMap((d) => d.flags.filter((f) => f.severity === 'high').map((f) => ({ d, f })))
+    return {
+      body: `${flagged.length} threads are high-risk right now:\n\n` +
+        flagged.map(({ d, f }) => `• ${d.account} · ${d.name} — ${f.label}`).join('\n'),
+      chips: [{ label: 'Go to Today', to: '/' }],
+    }
+  }
+
+  if (q.includes('next step')) {
+    const none = open.filter((d) => d.nextStep.status === 'empty')
+    return {
+      body: `${none.length} open threads have no next action — the #1 leak (“calls feel good but produce no next step”):\n\n` +
+        none.map((d) => `• ${d.account} · ${d.name} (${d.stage})`).join('\n') +
+        `\n\nLog a call or accept a Relay draft to fix these.`,
+      chips: [{ label: 'Go to Today', to: '/' }],
+    }
+  }
+
+  if (q.includes('propensity') || q.includes('highest') || q.includes('best') || q.includes('top')) {
+    const top = [...open].sort((a, b) => b.propensity - a.propensity).slice(0, 5)
+    return {
+      body: `Highest-propensity open deals:\n\n` +
+        top.map((d) => `• ${pct(d.propensity)} — ${d.account} · ${d.name} (${formatCurrency(d.tcv)})`).join('\n'),
+      chips: top[0] ? [{ label: `Open ${top[0].account}`, to: `/deal/${top[0].id}` }] : undefined,
+    }
+  }
+
+  if (q.includes('warm') || q.includes('intro') || q.includes('referral') || q.includes('path')) {
+    return {
+      body: `${warmPaths.length} warm paths mapped (referral is the only channel closing here):\n\n` +
+        warmPaths.map((w) => `• ${w.target} — via ${w.via} (${w.strength})`).join('\n'),
+      chips: [{ label: 'Open warm paths', to: '/relationships' }],
+    }
+  }
+
+  return {
+    body:
+      `I answer over your live pipeline — ${open.length} open threads, ${formatCurrency(open.reduce((s, d) => s + d.tcv, 0))} open value.\n\n` +
+      `Try: what's stalled, which deals have no next step, an account name, or a propensity question.`,
+  }
+}
 
 export function AskRelay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [q, setQ] = useState('')
-  const [answer, setAnswer] = useState<Answer | null>(null)
+  const [result, setResult] = useState<Answer | null>(null)
   const [thinking, setThinking] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
+  const { data: deals } = useDeals()
+  const { data: warmPaths } = useWarmPaths()
 
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 40)
       setQ('')
-      setAnswer(null)
+      setResult(null)
     }
   }, [open])
 
   function ask(query: string) {
     setQ(query)
     setThinking(true)
-    setAnswer(null)
-    const hit =
-      SCRIPTED.find((s) => s.q.toLowerCase() === query.toLowerCase().trim()) ||
-      SCRIPTED.find((s) => query.toLowerCase().split(' ').some((w) => w.length > 3 && s.q.toLowerCase().includes(w)))
+    setResult(null)
     setTimeout(() => {
       setThinking(false)
-      setAnswer(
-        hit?.a ?? {
-          body:
-            "In this prototype I answer over the seeded pipeline. Try one of the suggested questions — in phase 2 this runs as a Supabase Edge Function over the live deal graph (same pattern as your dashboard's chat-analyst).",
-        },
-      )
-    }, 650)
+      setResult(answer(query, deals ?? [], warmPaths ?? []))
+    }, 450)
   }
 
   if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] px-4 bg-black/20" onClick={onClose}>
-      <div
-        className="w-full max-w-2xl bg-card hairline rounded-xl overflow-hidden fade-up shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-2xl bg-card hairline rounded-xl overflow-hidden fade-up shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 px-4 py-3 hairline-b">
           <Sparkles size={16} className="text-accent" />
           <input
@@ -102,25 +126,19 @@ export function AskRelay({ open, onClose }: { open: boolean; onClose: () => void
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && q.trim() && ask(q)}
-            placeholder="Ask Relay anything — or tell it to do something…"
+            placeholder="Ask Relay anything about your pipeline…"
             className="flex-1 bg-transparent outline-none text-[14px] placeholder:text-tertiary"
           />
           <kbd className="text-[10px] text-tertiary hairline rounded px-1.5 py-0.5">esc</kbd>
-          <button onClick={onClose} className="text-tertiary hover:text-secondary">
-            <X size={15} />
-          </button>
+          <button onClick={onClose} className="text-tertiary hover:text-secondary"><X size={15} /></button>
         </div>
 
         <div className="max-h-[52vh] overflow-y-auto no-scrollbar">
-          {!answer && !thinking && (
+          {!result && !thinking && (
             <div className="p-3">
               <div className="text-[11px] text-tertiary px-1 pb-1.5">Suggested</div>
               {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => ask(s)}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-hover text-[13px] flex items-center gap-2"
-                >
+                <button key={s} onClick={() => ask(s)} className="w-full text-left px-3 py-2 rounded-md hover:bg-hover text-[13px] flex items-center gap-2">
                   <Zap size={13} className="text-accent shrink-0" />
                   {s}
                 </button>
@@ -135,20 +153,15 @@ export function AskRelay({ open, onClose }: { open: boolean; onClose: () => void
             </div>
           )}
 
-          {answer && (
+          {result && (
             <div className="p-4 fade-up">
-              <div className="text-[13px] leading-relaxed text-primary whitespace-pre-line">{answer.body}</div>
-              {answer.chips && (
+              <div className="text-[13px] leading-relaxed text-primary whitespace-pre-line">{result.body}</div>
+              {result.chips && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {answer.chips.map((c) => (
+                  {result.chips.map((c) => (
                     <button
                       key={c.label}
-                      onClick={() => {
-                        if (c.to) {
-                          navigate(c.to)
-                          onClose()
-                        }
-                      }}
+                      onClick={() => { if (c.to) { navigate(c.to); onClose() } }}
                       className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-soft)] text-accent px-2.5 py-1 text-[12px] hover:brightness-95"
                     >
                       {c.label}
@@ -156,9 +169,7 @@ export function AskRelay({ open, onClose }: { open: boolean; onClose: () => void
                   ))}
                 </div>
               )}
-              <button onClick={() => { setAnswer(null); setQ('') }} className="mt-3 text-[11px] text-tertiary hover:text-secondary">
-                Ask another
-              </button>
+              <button onClick={() => { setResult(null); setQ('') }} className="mt-3 text-[11px] text-tertiary hover:text-secondary">Ask another</button>
             </div>
           )}
         </div>
