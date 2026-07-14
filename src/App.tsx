@@ -5,6 +5,7 @@ import { Today } from './views/Today'
 import { Pipeline } from './views/Pipeline'
 import { DealDetail } from './views/DealDetail'
 import { Capture } from './views/Capture'
+import { Precall } from './views/Precall'
 import { Relationships } from './views/Relationships'
 import { Accounts } from './views/Accounts'
 
@@ -16,6 +17,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Today />} />
             <Route path="/pipeline" element={<Pipeline />} />
+            <Route path="/precall" element={<Precall />} />
             <Route path="/deal/:id" element={<DealDetail />} />
             <Route path="/capture" element={<Capture />} />
             <Route path="/relationships" element={<Relationships />} />

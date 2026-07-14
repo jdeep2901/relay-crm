@@ -76,6 +76,24 @@ export interface Deal {
   flags: Flag[]
   latentReason?: string
   partnerSource?: string
+  nextMeetingDate?: string // ISO — the anchor for pre-call planning
+  serviceLine?: string
+  problemSpace?: string
+  mondayItemId?: string // link back to the Monday deal for write-back
+}
+
+// Pre-call planning brief: company + prospect research → smart discovery questions.
+export interface PrecallBrief {
+  dealId: string
+  meetingDate?: string
+  companySummary?: string
+  companySignals: { label: string; detail: string; source?: string }[]
+  prospectSummary?: string
+  angle?: string
+  smartQuestions: { q: string; why?: string }[]
+  watchouts: string[]
+  sources: { title: string; url: string }[]
+  generatedAt?: string
 }
 
 export type FlagKind =

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Phone, Mail, Linkedin, StickyNote, GitBranch, Sparkles, Check, Clock,
   ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp, Loader2,
 } from 'lucide-react'
-import { useDeal, useAcceptField, useMoveToLatent, useReviveDeal } from '../lib/queries'
+import { useDeal, useAcceptField, useMoveToLatent, useReviveDeal, usePrecallBriefs } from '../lib/queries'
 import { formatCurrency, shortDate, pct } from '../lib/format'
 import { isClosed } from '../lib/constants'
 import { Card, Pill, Avatar, StageDot, PropensityMeter, Loading, ErrorState } from '../components/ui'
@@ -19,6 +19,7 @@ export function DealDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { deal, isLoading, error } = useDeal(id)
+  const { data: briefs } = usePrecallBriefs()
   const acceptField = useAcceptField()
   const moveToLatent = useMoveToLatent()
   const revive = useReviveDeal()
@@ -32,6 +33,7 @@ export function DealDetail() {
   const touches = [...deal.touches].sort((a, b) => b.date.localeCompare(a.date))
   const isLatentStage = ['Latent Pool', 'Disqualified'].includes(deal.stage)
   const accept = (key: string) => acceptField.mutateAsync({ dealId: deal.id, key })
+  const brief = briefs?.[deal.id]
 
   return (
     <div>
@@ -57,6 +59,26 @@ export function DealDetail() {
       <div className="grid grid-cols-[1fr_320px] gap-5 items-start">
         {/* Left column */}
         <div className="flex flex-col gap-5">
+          {/* Pre-call brief */}
+          {brief && (
+            <Card className="p-4" onClick={() => navigate('/precall')}>
+              <div className="flex items-center gap-1.5 mb-2 text-[11px] text-secondary">
+                <Sparkles size={13} className="text-accent" /> Pre-call brief
+                {deal.nextMeetingDate && <Pill tone="accent">meeting {shortDate(deal.nextMeetingDate)}</Pill>}
+              </div>
+              {brief.angle && (
+                <div className="rounded-md p-3 mb-2" style={{ background: 'var(--accent-soft)' }}>
+                  <div className="text-[10px] font-medium text-accent mb-0.5">The way in</div>
+                  <p className="text-[13px] leading-snug" style={{ color: 'var(--text-primary)' }}>{brief.angle}</p>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-[12px] text-secondary">
+                <span>{brief.smartQuestions.length} smart questions · {brief.companySignals.length} company signals</span>
+                <span className="text-accent inline-flex items-center gap-1">Open brief <ArrowRight size={12} /></span>
+              </div>
+            </Card>
+          )}
+
           {/* Next step */}
           <Card className="p-4">
             <div className="flex items-center gap-1.5 mb-2 text-[11px] text-secondary">

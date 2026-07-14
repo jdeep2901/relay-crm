@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import type {
   Deal, CaptureItem, WarmPath, ExtractedField, Owner, Stage, Vertical,
-  Channel, Touch, TouchType, Contact, Flag,
+  Channel, Touch, TouchType, Contact, Flag, PrecallBrief,
 } from '../data/types'
 
 // ── Row shapes (relay schema) ────────────────────────────────────────────────
@@ -14,6 +14,8 @@ interface DealRow {
   propensity_base: number; propensity: number
   propensity_criteria: { label: string; met: boolean; delta: number }[]
   flags: Flag[]; latent_reason: string | null; partner_source: string | null
+  next_meeting_date: string | null; service_line: string | null
+  problem_space: string | null; monday_item_id: string | null
   relay_accounts: { name: string } | null
 }
 interface FieldRow {
@@ -109,6 +111,9 @@ async function fetchDeals(): Promise<Deal[]> {
       propensityCriteria: row.propensity_criteria ?? [],
       touches: touchList, flags: row.flags ?? [],
       latentReason: row.latent_reason ?? undefined, partnerSource: row.partner_source ?? undefined,
+      nextMeetingDate: row.next_meeting_date ? d(row.next_meeting_date) : undefined,
+      serviceLine: row.service_line ?? undefined, problemSpace: row.problem_space ?? undefined,
+      mondayItemId: row.monday_item_id ?? undefined,
     }
   })
 }
@@ -193,6 +198,32 @@ async function fetchWarmPaths(): Promise<WarmPath[]> {
 
 export function useWarmPaths() {
   return useQuery({ queryKey: ['warm_paths'], queryFn: fetchWarmPaths })
+}
+
+// ── Pre-call briefs ──────────────────────────────────────────────────────────
+async function fetchBriefs(): Promise<Record<string, PrecallBrief>> {
+  const { data, error } = await supabase.from('precall_briefs').select('*')
+  if (error) throw error
+  const out: Record<string, PrecallBrief> = {}
+  for (const r of data as Array<Record<string, unknown>>) {
+    out[r.deal_id as string] = {
+      dealId: r.deal_id as string,
+      meetingDate: r.meeting_date ? String(r.meeting_date).slice(0, 10) : undefined,
+      companySummary: (r.company_summary as string) ?? undefined,
+      companySignals: (r.company_signals as PrecallBrief['companySignals']) ?? [],
+      prospectSummary: (r.prospect_summary as string) ?? undefined,
+      angle: (r.angle as string) ?? undefined,
+      smartQuestions: (r.smart_questions as PrecallBrief['smartQuestions']) ?? [],
+      watchouts: (r.watchouts as string[]) ?? [],
+      sources: (r.sources as PrecallBrief['sources']) ?? [],
+      generatedAt: (r.generated_at as string) ?? undefined,
+    }
+  }
+  return out
+}
+
+export function usePrecallBriefs() {
+  return useQuery({ queryKey: ['precall_briefs'], queryFn: fetchBriefs })
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────

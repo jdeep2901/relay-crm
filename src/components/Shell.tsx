@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Kanban, Inbox, Waypoints, Building2, Search, Sparkles, Command, Mic, LogOut } from 'lucide-react'
+import { Home, Kanban, Inbox, Waypoints, Building2, Search, Sparkles, Command, Mic, LogOut, CalendarClock } from 'lucide-react'
 import { AskRelay } from './AskRelay'
 import { LogCall } from './LogCall'
 import { Avatar } from './ui'
 import { useAuth } from '../lib/auth'
-import { useCaptures } from '../lib/queries'
+import { useCaptures, useDeals } from '../lib/queries'
+import { TODAY_ISO } from '../lib/format'
 
 export function Shell({ children }: { children: ReactNode }) {
   const [askOpen, setAskOpen] = useState(false)
@@ -13,7 +14,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const { userName, signOut } = useAuth()
   const { data: captures } = useCaptures()
+  const { data: deals } = useDeals()
   const unreviewed = captures?.filter((c) => !c.reviewed).length ?? 0
+  const weekEnd = new Date(new Date(TODAY_ISO + 'T00:00:00').getTime() + 7 * 86_400_000).toISOString().slice(0, 10)
+  const upcoming = deals?.filter((d) => d.nextMeetingDate && d.nextMeetingDate >= TODAY_ISO && d.nextMeetingDate <= weekEnd).length ?? 0
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -29,6 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const nav = [
     { to: '/', label: 'Today', icon: Home, end: true, badge: 0 },
     { to: '/pipeline', label: 'Pipeline', icon: Kanban, badge: 0 },
+    { to: '/precall', label: 'Pre-call', icon: CalendarClock, badge: upcoming },
     { to: '/capture', label: 'Capture', icon: Inbox, badge: unreviewed },
     { to: '/relationships', label: 'Warm paths', icon: Waypoints, badge: 0 },
     { to: '/accounts', label: 'Accounts', icon: Building2, badge: 0 },
