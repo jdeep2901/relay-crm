@@ -51,9 +51,10 @@ function Login() {
             <div className="text-[12px] text-secondary mt-0.5">Your pipeline is private — data loads only after you log in.</div>
           </div>
           <label className="text-[11px] text-secondary">
-            Email
+            Name
             <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus
+              type="text" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus
+              placeholder="e.g. swetha"
               className="mt-1 w-full hairline rounded-md px-2.5 py-2 text-[13px] bg-card outline-none focus:border-[var(--accent)]"
             />
           </label>

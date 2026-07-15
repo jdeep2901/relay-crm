@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     'You'
 
   async function signIn(email: string, password: string) {
+    // Login is a bare first name (e.g. "swetha"); JD uses his full email. Pass as-is.
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error: error?.message ?? null }
   }
