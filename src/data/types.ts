@@ -136,6 +136,7 @@ export interface CaptureItem {
   proposedNextStep: string
   proposedStageMove?: { from: Stage; to: Stage }
   reviewed: boolean
+  vertical?: Vertical
 }
 
 // A warm-intro path in the relationship graph.

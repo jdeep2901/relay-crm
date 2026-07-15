@@ -134,6 +134,7 @@ interface CaptureRow {
   occurred_on: string; duration_min: number | null; summary: string | null
   proposed_next_step: string | null; proposed_stage_from: Stage | null
   proposed_stage_to: Stage | null; reviewed: boolean
+  deal: { vertical: Vertical } | null; account: { vertical: Vertical } | null
 }
 interface SuggRow {
   id: string; capture_id: string; field: string; value: string | null; quote: string | null
@@ -142,7 +143,7 @@ interface SuggRow {
 
 async function fetchCaptures(): Promise<CaptureItem[]> {
   const [caps, suggs] = await Promise.all([
-    supabase.from('captures').select('*').order('occurred_on', { ascending: false }),
+    supabase.from('captures').select('*, deal:deals(vertical), account:accounts(vertical)').order('occurred_on', { ascending: false }),
     supabase.from('capture_suggestions').select('*').order('position'),
   ])
   if (caps.error) throw caps.error
@@ -174,6 +175,7 @@ async function fetchCaptures(): Promise<CaptureItem[]> {
         ? { from: c.proposed_stage_from, to: c.proposed_stage_to }
         : undefined,
     reviewed: c.reviewed,
+    vertical: c.deal?.vertical ?? c.account?.vertical ?? undefined,
   }))
 }
 
