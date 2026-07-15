@@ -137,7 +137,7 @@ interface CaptureRow {
 }
 interface SuggRow {
   id: string; capture_id: string; field: string; value: string | null; quote: string | null
-  owner: Owner; status: 'pending' | 'accepted' | 'rejected'; position: number
+  owner: Owner; status: 'pending' | 'accepted' | 'rejected'; position: number; confidence: number | null
 }
 
 async function fetchCaptures(): Promise<CaptureItem[]> {
@@ -165,8 +165,8 @@ async function fetchCaptures(): Promise<CaptureItem[]> {
     durationMin: c.duration_min ?? undefined,
     summary: c.summary ?? '',
     extracted: (byCap.get(c.id) ?? []).map((s) => ({
-      field: s.field, value: s.value ?? '', quote: s.quote ?? '',
-      owner: s.owner, accepted: s.status === 'accepted',
+      id: s.id, field: s.field, value: s.value ?? '', quote: s.quote ?? '',
+      owner: s.owner, status: s.status, confidence: Number(s.confidence ?? 0.9),
     })),
     proposedNextStep: c.proposed_next_step ?? '',
     proposedStageMove:
@@ -247,6 +247,52 @@ export function useAcceptField() {
         .eq('deal_id', dealId)
         .eq('key', key)
       if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+}
+
+// Review a single suggestion: accept / edit-and-accept / reject — persisted.
+// When accepting a core field on a deal-linked capture, apply it to the deal too.
+const CORE_LABEL: Record<string, string> = {
+  'Problem statement': 'problem_statement',
+  'Intent': 'intent',
+  'Fund timeline / budget': 'budget',
+  'Budget signal': 'budget',
+}
+
+export function useReviewSuggestion() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: async (input: {
+      id: string
+      status: 'accepted' | 'rejected'
+      value: string
+      field: string
+      owner: Owner
+      quote?: string
+      dealId?: string
+      source?: string
+    }) => {
+      const { error } = await supabase
+        .from('capture_suggestions')
+        .update({ status: input.status, value: input.value })
+        .eq('id', input.id)
+      if (error) throw error
+
+      if (input.status === 'accepted' && input.dealId) {
+        const key = CORE_LABEL[input.field]
+        if (key) {
+          await supabase.from('deal_fields').upsert(
+            {
+              deal_id: input.dealId, key, value: input.value, quote: input.quote ?? null,
+              source: input.source ?? 'GoodMeetings', owner: input.owner,
+              status: 'confirmed', confidence: 0.9, updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'deal_id,key' },
+          )
+        }
+      }
     },
     onSuccess: invalidate,
   })

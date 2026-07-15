@@ -125,11 +125,13 @@ export interface CaptureItem {
   durationMin?: number
   summary: string
   extracted: {
+    id: string
     field: string
     value: string
     quote: string
     owner: Owner
-    accepted: boolean
+    status: 'pending' | 'accepted' | 'rejected'
+    confidence: number
   }[]
   proposedNextStep: string
   proposedStageMove?: { from: Stage; to: Stage }

@@ -3,3 +3,8 @@ dist
 shots
 .DS_Store
 *.local
+
+# Real client call transcripts — must NEVER be committed to this public repo
+GoodMeetings Transcripts/
+*.transcript
+transcripts/
