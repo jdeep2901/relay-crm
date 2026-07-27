@@ -134,7 +134,9 @@ interface CaptureRow {
   occurred_on: string; duration_min: number | null; summary: string | null
   proposed_next_step: string | null; proposed_stage_from: Stage | null
   proposed_stage_to: Stage | null; reviewed: boolean
-  deal: { vertical: Vertical } | null; account: { vertical: Vertical } | null
+  call_instance_id: string | null; meeting_date: string | null
+  deal: { vertical: Vertical; name: string; account: { name: string } | null } | null
+  account: { vertical: Vertical } | null
 }
 interface SuggRow {
   id: string; capture_id: string; field: string; value: string | null; quote: string | null
@@ -143,7 +145,7 @@ interface SuggRow {
 
 async function fetchCaptures(): Promise<CaptureItem[]> {
   const [caps, suggs] = await Promise.all([
-    supabase.from('captures').select('*, deal:deals(vertical), account:accounts(vertical)').order('occurred_on', { ascending: false }),
+    supabase.from('captures').select('*, deal:deals(vertical, name, account:accounts(name)), account:accounts(vertical)').order('occurred_on', { ascending: false }),
     supabase.from('capture_suggestions').select('*').order('position'),
   ])
   if (caps.error) throw caps.error
@@ -154,13 +156,17 @@ async function fetchCaptures(): Promise<CaptureItem[]> {
     a.push(s)
     byCap.set(s.capture_id, a)
   }
-  return (caps.data as CaptureRow[]).map((c): CaptureItem => ({
+  const items = (caps.data as CaptureRow[]).map((c): CaptureItem => ({
     id: c.id,
     kind: c.kind === 'manual' ? 'transcript' : c.kind,
     source: c.source,
     title: c.title,
     account: c.account_name ?? '—',
     dealId: c.deal_id ?? undefined,
+    dealAccount: c.deal?.account?.name ?? undefined,
+    dealContact: c.deal?.name ?? undefined,
+    callInstanceId: c.call_instance_id ?? undefined,
+    meetingDate: c.meeting_date ? d(c.meeting_date) : d(c.occurred_on),
     who: c.who ?? '',
     date: d(c.occurred_on),
     durationMin: c.duration_min ?? undefined,
@@ -177,6 +183,20 @@ async function fetchCaptures(): Promise<CaptureItem[]> {
     reviewed: c.reviewed,
     vertical: c.deal?.vertical ?? c.account?.vertical ?? undefined,
   }))
+
+  // Per-deal meeting sequence: order a deal's calls by date → "Call N of M".
+  const byDeal = new Map<string, CaptureItem[]>()
+  for (const it of items) {
+    if (!it.dealId) continue
+    const a = byDeal.get(it.dealId) ?? []
+    a.push(it)
+    byDeal.set(it.dealId, a)
+  }
+  for (const group of byDeal.values()) {
+    group.sort((a, b) => (a.meetingDate ?? '').localeCompare(b.meetingDate ?? ''))
+    group.forEach((it, i) => { it.meetingSeq = i + 1; it.meetingTotal = group.length })
+  }
+  return items
 }
 
 export function useCaptures() {

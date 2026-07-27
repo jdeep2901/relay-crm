@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, Linkedin, StickyNote, GitBranch, Sparkles, Check, Clock,
-  ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp, Loader2,
+  ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp, Loader2, Mic,
 } from 'lucide-react'
-import { useDeal, useAcceptField, useMoveToLatent, useReviveDeal, usePrecallBriefs } from '../lib/queries'
+import { useDeal, useAcceptField, useMoveToLatent, useReviveDeal, usePrecallBriefs, useCaptures } from '../lib/queries'
 import { formatCurrency, shortDate, pct } from '../lib/format'
 import { isClosed } from '../lib/constants'
 import { Card, Pill, Avatar, StageDot, PropensityMeter, Loading, ErrorState } from '../components/ui'
@@ -20,6 +20,7 @@ export function DealDetail() {
   const navigate = useNavigate()
   const { deal, isLoading, error } = useDeal(id)
   const { data: briefs } = usePrecallBriefs()
+  const { data: allCaptures } = useCaptures()
   const acceptField = useAcceptField()
   const moveToLatent = useMoveToLatent()
   const revive = useReviveDeal()
@@ -34,6 +35,9 @@ export function DealDetail() {
   const isLatentStage = ['Latent Pool', 'Disqualified'].includes(deal.stage)
   const accept = (key: string) => acceptField.mutateAsync({ dealId: deal.id, key })
   const brief = briefs?.[deal.id]
+  const calls = (allCaptures ?? [])
+    .filter((c) => c.dealId === deal.id)
+    .sort((a, b) => (a.meetingDate ?? '').localeCompare(b.meetingDate ?? ''))
 
   return (
     <div>
@@ -75,6 +79,34 @@ export function DealDetail() {
               <div className="flex items-center justify-between text-[12px] text-secondary">
                 <span>{brief.smartQuestions.length} smart questions · {brief.companySignals.length} company signals</span>
                 <span className="text-accent inline-flex items-center gap-1">Open brief <ArrowRight size={12} /></span>
+              </div>
+            </Card>
+          )}
+
+          {/* Calls — meeting thread from GoodMeetings */}
+          {calls.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center gap-1.5 mb-2.5 text-[11px] text-secondary">
+                <Mic size={13} className="text-accent" /> Calls · {calls.length} on this deal
+              </div>
+              <div className="flex flex-col">
+                {calls.map((c, i) => {
+                  const pending = c.extracted.filter((f) => f.status === 'pending').length
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => navigate('/capture', { state: { focus: c.id } })}
+                      className="flex items-center gap-3 py-2 hairline-t first:border-t-0 text-left hover:bg-hover -mx-1 px-1 rounded"
+                    >
+                      <span className="num text-[11px] text-accent w-12 shrink-0">Call {i + 1}</span>
+                      <span className="text-[12px] text-secondary w-16 shrink-0">{c.meetingDate ? shortDate(c.meetingDate) : '—'}</span>
+                      <span className="text-[12px] text-primary truncate flex-1">{c.title}</span>
+                      {pending > 0
+                        ? <Pill tone="amber">{pending} to review</Pill>
+                        : <Pill tone="green" icon={<Check size={10} />}>reviewed</Pill>}
+                    </button>
+                  )
+                })}
               </div>
             </Card>
           )}

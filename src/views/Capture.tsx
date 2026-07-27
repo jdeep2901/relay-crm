@@ -88,6 +88,14 @@ function InboxRow({ item, active, onClick }: { item: CaptureItem; active: boolea
         <span className="text-[11px] text-tertiary ml-auto shrink-0">{shortDate(item.date)}</span>
       </div>
       <div className="text-[13px] font-medium leading-snug truncate">{item.title}</div>
+      {item.dealId ? (
+        <div className="text-[11px] text-secondary truncate mt-0.5">
+          → {item.dealAccount ?? item.account}{item.dealContact ? ` · ${item.dealContact}` : ''}
+          {item.meetingTotal ? <span className="text-accent"> · call {item.meetingSeq}/{item.meetingTotal}</span> : null}
+        </div>
+      ) : (
+        <div className="text-[11px] text-tertiary mt-0.5">not linked to a deal</div>
+      )}
       <div className="flex items-center gap-2 mt-1.5">
         <span className="num text-[11px] text-tertiary">{item.extracted.length} fields</span>
         {pending > 0
@@ -121,8 +129,10 @@ function ReviewPanel({ item }: { item: CaptureItem }) {
         <div>
           <div className="text-[15px] font-medium">{item.title}</div>
           <div className="text-[12px] text-tertiary mt-0.5">
-            {item.who} · {shortDate(item.date)} · {item.account}
-            {!item.dealId && <span className="text-amber-text"> · not linked to a deal</span>}
+            {item.who} · {shortDate(item.meetingDate ?? item.date)}
+            {item.dealId
+              ? <span className="text-secondary"> · {item.dealAccount ?? item.account}{item.dealContact ? ` — ${item.dealContact}` : ''}{item.meetingTotal ? <span className="text-accent"> · call {item.meetingSeq} of {item.meetingTotal}</span> : null}</span>
+              : <span className="text-amber-text"> · not linked to a deal</span>}
           </div>
         </div>
         {counts.pending === 0 ? (

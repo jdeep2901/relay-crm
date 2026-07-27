@@ -137,6 +137,12 @@ export interface CaptureItem {
   proposedStageMove?: { from: Stage; to: Stage }
   reviewed: boolean
   vertical?: Vertical
+  dealAccount?: string        // linked Monday deal's account
+  dealContact?: string        // linked Monday deal's contact
+  callInstanceId?: string     // GoodMeetings per-meeting key
+  meetingDate?: string
+  meetingSeq?: number         // "Call N" within the deal
+  meetingTotal?: number       // "of M"
 }
 
 // A warm-intro path in the relationship graph.
