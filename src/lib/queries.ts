@@ -321,6 +321,22 @@ export function useReviewSuggestion() {
   })
 }
 
+// Reassign a capture (one call) to a different deal — or unlink it entirely.
+// Per-call, so a multi-call thread can be split across deals.
+export function useReassignCapture() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: async ({ captureId, dealId }: { captureId: string; dealId: string | null }) => {
+      const { error } = await supabase
+        .from('captures')
+        .update({ deal_id: dealId, unmatched: dealId === null })
+        .eq('id', captureId)
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+}
+
 // Accept a whole capture: confirm all suggestions, apply the drafted next step +
 // stage move to the deal, log a touch, and mark the capture reviewed.
 export function useAcceptCapture() {

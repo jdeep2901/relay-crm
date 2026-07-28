@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Mic, Mail, Check, Sparkles, ArrowRight, CircleAlert, Clock, CheckCheck, Loader2,
-  Pencil, X, RotateCcw, ShieldCheck, Search as SearchIcon,
+  Pencil, X, RotateCcw, ShieldCheck, Search as SearchIcon, Link2, Unlink,
 } from 'lucide-react'
-import { useCaptures, useAcceptCapture, useReviewSuggestion } from '../lib/queries'
+import { useCaptures, useAcceptCapture, useReviewSuggestion, useReassignCapture, useDeals } from '../lib/queries'
 import { shortDate } from '../lib/format'
 import { Card, Pill, Loading, ErrorState } from '../components/ui'
 import type { CaptureItem, Owner, Vertical } from '../data/types'
@@ -164,10 +164,8 @@ function ReviewPanel({ item }: { item: CaptureItem }) {
           <div className="text-[15px] font-medium">{item.title}</div>
           <div className="text-[12px] text-tertiary mt-0.5">
             {item.who} · {shortDate(item.meetingDate ?? item.date)}
-            {item.dealId
-              ? <span className="text-secondary"> · {item.dealAccount ?? item.account}{item.dealContact ? ` — ${item.dealContact}` : ''}{item.meetingTotal ? <span className="text-accent"> · call {item.meetingSeq} of {item.meetingTotal}</span> : null}</span>
-              : <span className="text-amber-text"> · not linked to a deal</span>}
           </div>
+          <DealLink item={item} />
         </div>
         {counts.pending === 0 ? (
           <Pill tone="green" icon={<CheckCheck size={12} />}>all reviewed</Pill>
@@ -240,6 +238,90 @@ function ReviewPanel({ item }: { item: CaptureItem }) {
         )}
       </div>
     </Card>
+  )
+}
+
+// Which deal this single call belongs to — reassignable, so a multi-call thread
+// can be split across the several deals an account really has.
+function DealLink({ item }: { item: CaptureItem }) {
+  const { data: deals } = useDeals()
+  const reassign = useReassignCapture()
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+
+  const options = useMemo(() => {
+    if (!deals) return []
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const acct = norm(item.dealAccount ?? item.account ?? '')
+    const scored = deals.map((d) => ({
+      d,
+      sibling: acct.length > 3 && (norm(d.account).includes(acct) || acct.includes(norm(d.account))),
+    }))
+    const term = q.trim().toLowerCase()
+    return scored
+      .filter(({ d }) => !term || `${d.account} ${d.name} ${d.stage}`.toLowerCase().includes(term))
+      .sort((a, b) => (a.sibling === b.sibling ? a.d.account.localeCompare(b.d.account) : a.sibling ? -1 : 1))
+      .slice(0, 40)
+  }, [deals, q, item.dealAccount, item.account])
+
+  const move = async (dealId: string | null) => {
+    await reassign.mutateAsync({ captureId: item.id, dealId })
+    setOpen(false); setQ('')
+  }
+
+  return (
+    <div className="mt-1 text-[12px]">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {item.dealId ? (
+          <>
+            <Link2 size={11} className="text-tertiary" />
+            <span className="text-secondary">{item.dealAccount ?? item.account}</span>
+            {item.dealContact && <span className="text-tertiary">— {item.dealContact}</span>}
+            {item.meetingTotal ? <span className="text-accent">· call {item.meetingSeq} of {item.meetingTotal}</span> : null}
+          </>
+        ) : (
+          <span className="text-amber-text">Not linked to a deal</span>
+        )}
+        <button onClick={() => setOpen((o) => !o)} className="text-accent hover:underline ml-1">
+          {item.dealId ? 'Change deal' : 'Link to deal'}
+        </button>
+        {item.dealId && (
+          <button onClick={() => move(null)} className="text-tertiary hover:text-secondary inline-flex items-center gap-0.5" title="Unlink from deal">
+            <Unlink size={10} /> unlink
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="mt-2 hairline rounded-md bg-card p-2 w-[420px]">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <SearchIcon size={12} className="text-tertiary" />
+            <input
+              autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder="Search deals by account, contact, stage…"
+              className="flex-1 bg-transparent text-[12px] outline-none placeholder:text-tertiary"
+            />
+            <button onClick={() => setOpen(false)} className="text-tertiary hover:text-secondary"><X size={12} /></button>
+          </div>
+          <div className="max-h-56 overflow-y-auto no-scrollbar flex flex-col">
+            {options.map(({ d, sibling }) => (
+              <button
+                key={d.id}
+                onClick={() => move(d.id)}
+                disabled={reassign.isPending}
+                className={`text-left px-2 py-1.5 rounded hover:bg-hover flex items-center gap-2 ${d.id === item.dealId ? 'bg-surface' : ''}`}
+              >
+                <span className="text-[12px] font-medium truncate max-w-[150px]">{d.account}</span>
+                <span className="text-[11px] text-tertiary truncate flex-1">{d.name}</span>
+                {sibling && <Pill tone="accent">same account</Pill>}
+                <span className="text-[10px] text-secondary shrink-0">{d.stage}</span>
+              </button>
+            ))}
+            {options.length === 0 && <div className="text-[11px] text-tertiary px-2 py-2">No matching deals.</div>}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
