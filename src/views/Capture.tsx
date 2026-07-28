@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Mic, Mail, Check, Sparkles, ArrowRight, CircleAlert, Clock, CheckCheck, Loader2,
-  Pencil, X, RotateCcw, ShieldCheck,
+  Pencil, X, RotateCcw, ShieldCheck, Search as SearchIcon,
 } from 'lucide-react'
 import { useCaptures, useAcceptCapture, useReviewSuggestion } from '../lib/queries'
 import { shortDate } from '../lib/format'
@@ -24,6 +24,7 @@ export function Capture() {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [vert, setVert] = useState<Vertical | 'All' | 'Won'>('All')
   const [stage, setStage] = useState<string>('All stages')
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     if (!captures?.length) return
@@ -41,7 +42,12 @@ export function Capture() {
   const matches = (c: CaptureItem, v: Vertical | 'All' | 'Won') =>
     v === 'All' ? true : v === 'Won' ? c.dealStage === 'Won' : c.vertical === v && c.dealStage !== 'Won'
   const stageMatch = (c: CaptureItem) => stage === 'All stages' || c.dealStage === stage
-  const filtered = captures.filter((c) => matches(c, vert) && stageMatch(c))
+  const q = query.trim().toLowerCase()
+  const queryMatch = (c: CaptureItem) =>
+    !q ||
+    [c.title, c.account, c.dealAccount, c.dealContact, c.who, c.summary]
+      .some((s) => s && s.toLowerCase().includes(q))
+  const filtered = captures.filter((c) => matches(c, vert) && stageMatch(c) && queryMatch(c))
   const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0]
   const countFor = (v: Vertical | 'All' | 'Won') => captures.filter((c) => matches(c, v)).length
 
@@ -65,10 +71,22 @@ export function Capture() {
             <span className="num text-[10px] text-tertiary">{countFor(v)}</span>
           </button>
         ))}
+        <div className="ml-auto flex items-center gap-1.5 hairline rounded-md px-2 py-1 bg-card">
+          <SearchIcon size={12} className="text-tertiary shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search threads…"
+            className="w-40 bg-transparent text-[12px] outline-none placeholder:text-tertiary"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="text-tertiary hover:text-secondary text-[11px]">✕</button>
+          )}
+        </div>
         <select
           value={stage}
           onChange={(e) => setStage(e.target.value)}
-          className="ml-auto hairline rounded-md bg-card text-[12px] px-2 py-1 text-secondary outline-none"
+          className="hairline rounded-md bg-card text-[12px] px-2 py-1 text-secondary outline-none"
         >
           {STAGES.map((s) => (
             <option key={s} value={s}>{s === 'All stages' ? 'All stages' : `Stage: ${s}`}</option>
