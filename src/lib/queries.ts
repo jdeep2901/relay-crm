@@ -135,7 +135,7 @@ interface CaptureRow {
   proposed_next_step: string | null; proposed_stage_from: Stage | null
   proposed_stage_to: Stage | null; reviewed: boolean
   call_instance_id: string | null; meeting_date: string | null
-  deal: { vertical: Vertical; name: string; account: { name: string } | null } | null
+  deal: { vertical: Vertical; name: string; stage: Stage; account: { name: string } | null } | null
   account: { vertical: Vertical } | null
 }
 interface SuggRow {
@@ -145,7 +145,7 @@ interface SuggRow {
 
 async function fetchCaptures(): Promise<CaptureItem[]> {
   const [caps, suggs] = await Promise.all([
-    supabase.from('captures').select('*, deal:deals(vertical, name, account:accounts(name)), account:accounts(vertical)').order('occurred_on', { ascending: false }),
+    supabase.from('captures').select('*, deal:deals(vertical, name, stage, account:accounts(name)), account:accounts(vertical)').order('occurred_on', { ascending: false }),
     supabase.from('capture_suggestions').select('*').order('position'),
   ])
   if (caps.error) throw caps.error
@@ -165,6 +165,7 @@ async function fetchCaptures(): Promise<CaptureItem[]> {
     dealId: c.deal_id ?? undefined,
     dealAccount: c.deal?.account?.name ?? undefined,
     dealContact: c.deal?.name ?? undefined,
+    dealStage: c.deal?.stage ?? undefined,
     callInstanceId: c.call_instance_id ?? undefined,
     meetingDate: c.meeting_date ? d(c.meeting_date) : d(c.occurred_on),
     who: c.who ?? '',

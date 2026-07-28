@@ -9,7 +9,8 @@ import { shortDate } from '../lib/format'
 import { Card, Pill, Loading, ErrorState } from '../components/ui'
 import type { CaptureItem, Owner, Vertical } from '../data/types'
 
-const VERTS: (Vertical | 'All')[] = ['All', 'Pharma', 'CPG', 'Retail', 'Tech']
+const VERTS: (Vertical | 'All' | 'Won')[] = ['All', 'Pharma', 'CPG', 'Retail', 'Tech', 'Won']
+const STAGES = ['All stages', 'Intro', 'Qualification', 'Capability', 'Problem Scoping', 'Proposal', 'Contracting', 'Won', 'Latent Pool'] as const
 
 const OWNER_TONE: Record<Owner, 'accent' | 'green' | 'amber'> = { sales: 'accent', solutioning: 'green', 'jd-sahana': 'amber' }
 const OWNER_LABEL: Record<Owner, string> = { sales: 'sales', solutioning: 'solutioning', 'jd-sahana': 'JD + Sahana' }
@@ -21,7 +22,8 @@ export function Capture() {
   const location = useLocation()
   const focusId = (location.state as { focus?: string } | null)?.focus
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
-  const [vert, setVert] = useState<Vertical | 'All'>('All')
+  const [vert, setVert] = useState<Vertical | 'All' | 'Won'>('All')
+  const [stage, setStage] = useState<string>('All stages')
 
   useEffect(() => {
     if (!captures?.length) return
@@ -36,9 +38,12 @@ export function Capture() {
   if (error) return <ErrorState error={error} />
   if (!captures?.length) return <div className="text-secondary text-[13px]">No captures yet. Use “Log a call” to add one.</div>
 
-  const filtered = vert === 'All' ? captures : captures.filter((c) => c.vertical === vert)
+  const matches = (c: CaptureItem, v: Vertical | 'All' | 'Won') =>
+    v === 'All' ? true : v === 'Won' ? c.dealStage === 'Won' : c.vertical === v && c.dealStage !== 'Won'
+  const stageMatch = (c: CaptureItem) => stage === 'All stages' || c.dealStage === stage
+  const filtered = captures.filter((c) => matches(c, vert) && stageMatch(c))
   const selected = filtered.find((c) => c.id === selectedId) ?? filtered[0]
-  const countFor = (v: Vertical | 'All') => (v === 'All' ? captures.length : captures.filter((c) => c.vertical === v).length)
+  const countFor = (v: Vertical | 'All' | 'Won') => captures.filter((c) => matches(c, v)).length
 
   return (
     <div>
@@ -47,7 +52,7 @@ export function Capture() {
         Every call lands here already tagged. Review each field — accept, edit, or dismiss. High-confidence tags are pre-accepted; the rest need a human.
       </p>
 
-      {/* Industry filter */}
+      {/* Industry + stage filters */}
       <div className="flex items-center gap-1 mb-3 hairline-b pb-2">
         {VERTS.map((v) => (
           <button
@@ -60,6 +65,15 @@ export function Capture() {
             <span className="num text-[10px] text-tertiary">{countFor(v)}</span>
           </button>
         ))}
+        <select
+          value={stage}
+          onChange={(e) => setStage(e.target.value)}
+          className="ml-auto hairline rounded-md bg-card text-[12px] px-2 py-1 text-secondary outline-none"
+        >
+          {STAGES.map((s) => (
+            <option key={s} value={s}>{s === 'All stages' ? 'All stages' : `Stage: ${s}`}</option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-[300px_1fr] gap-4">
@@ -83,7 +97,9 @@ function InboxRow({ item, active, onClick }: { item: CaptureItem; active: boolea
       <div className="flex items-center gap-2 mb-1">
         <Icon size={13} className="text-accent shrink-0" />
         <span className="text-[11px] text-secondary truncate">{item.source}</span>
-        {item.vertical && <Pill tone="neutral">{item.vertical}</Pill>}
+        {item.dealStage === 'Won'
+          ? <Pill tone="green">Won</Pill>
+          : item.vertical && <Pill tone="neutral">{item.vertical}</Pill>}
         {!item.dealId && <span className="text-[10px] text-tertiary">· no deal</span>}
         <span className="text-[11px] text-tertiary ml-auto shrink-0">{shortDate(item.date)}</span>
       </div>

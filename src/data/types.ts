@@ -139,6 +139,7 @@ export interface CaptureItem {
   vertical?: Vertical
   dealAccount?: string        // linked Monday deal's account
   dealContact?: string        // linked Monday deal's contact
+  dealStage?: Stage           // linked deal's stage (drives the Won tab)
   callInstanceId?: string     // GoodMeetings per-meeting key
   meetingDate?: string
   meetingSeq?: number         // "Call N" within the deal
