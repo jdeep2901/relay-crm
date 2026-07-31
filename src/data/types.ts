@@ -71,7 +71,7 @@ export interface Deal {
   contacts: Contact[]
   propensity: number // 0..1 auto-computed
   propensityBase: number // stage baseline from 2yr history
-  propensityCriteria: { label: string; met: boolean; delta: number }[]
+  propensityCriteria: { label: string; met: boolean; delta: number; quote?: string }[]
   touches: Touch[]
   flags: Flag[]
   latentReason?: string

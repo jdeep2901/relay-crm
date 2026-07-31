@@ -303,6 +303,11 @@ export function useReviewSuggestion() {
         .eq('id', input.id)
       if (error) throw error
 
+      // Accepting a propensity criterion changes the score — recompute.
+      if (/Fund timeline|Specific area need/i.test(input.field)) {
+        await supabase.rpc('refresh_propensity')
+      }
+
       if (input.status === 'accepted' && input.dealId) {
         const key = CORE_LABEL[input.field]
         if (key) {

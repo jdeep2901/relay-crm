@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Phone, Mail, Linkedin, StickyNote, GitBranch, Sparkles, Check, Clock,
-  ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp, Loader2, Mic,
+  ShieldQuestion, Waypoints, ArrowRight, Send, TrendingUp, Loader2, Mic, X,
 } from 'lucide-react'
 import { useDeal, useAcceptField, useMoveToLatent, useReviveDeal, usePrecallBriefs, useCaptures } from '../lib/queries'
 import { formatCurrency, shortDate, pct } from '../lib/format'
@@ -231,22 +231,38 @@ export function DealDetail() {
             </div>
             <div className="text-[11px] text-tertiary mb-1.5">How Relay computes it</div>
             <div className="flex items-center justify-between text-[12px] py-1">
-              <span className="text-secondary">{deal.stage} baseline (2yr history)</span>
+              <span className="text-secondary">{deal.stage} baseline</span>
               <span className="num">{pct(deal.propensityBase)}</span>
             </div>
             {deal.propensityCriteria.map((c) => (
-              <div key={c.label} className="flex items-center justify-between text-[12px] py-1">
-                <span className="inline-flex items-center gap-1.5">
-                  {c.met ? <Check size={12} className="text-green" /> : <span className="text-tertiary">—</span>}
-                  <span className="text-secondary">{c.label}</span>
-                </span>
-                <span className="num" style={{ color: c.delta > 0 ? 'var(--status-green)' : c.delta < 0 ? 'var(--status-red)' : 'var(--text-tertiary)' }}>
-                  {c.delta === 0 ? '—' : `${c.delta > 0 ? '+' : ''}${Math.round(c.delta * 100)}%`}
-                </span>
+              <div key={c.label} className="py-1">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="inline-flex items-center gap-1.5">
+                    {c.met ? <Check size={12} className="text-green" /> : <X size={12} className="text-red" />}
+                    <span className="text-secondary">{c.label}</span>
+                  </span>
+                  <span className="num" style={{ color: c.delta > 0 ? 'var(--status-green)' : c.delta < 0 ? 'var(--status-red)' : 'var(--text-tertiary)' }}>
+                    {c.delta === 0 ? '—' : `${c.delta > 0 ? '+' : ''}${Math.round(c.delta * 100)}%`}
+                  </span>
+                </div>
+                {c.quote && (
+                  <div className="text-[10.5px] text-tertiary italic mt-0.5 pl-[18px] leading-snug">
+                    “{c.quote.replace(/^“|”$/g, '').slice(0, 130)}”
+                  </div>
+                )}
               </div>
             ))}
+            {deal.propensityCriteria.length === 0 && (
+              <div className="text-[11px] text-tertiary py-1">
+                No criteria confirmed yet — accept budget or area-of-need in Capture to adjust.
+              </div>
+            )}
             <div className="hairline-t mt-1.5 pt-1.5 flex items-center justify-between text-[12px] font-medium">
               <span>Propensity</span><span className="num">{pct(deal.propensity)}</span>
+            </div>
+            <div className="text-[10px] text-tertiary mt-2 leading-snug">
+              Baseline = observed win rate for deals that reached this stage (81 snapshots, Feb–Jul 2026;
+              latent counted as lost). Criteria come from accepted call extractions.
             </div>
           </Card>
 
