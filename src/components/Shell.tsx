@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Home, Kanban, Inbox, Waypoints, Building2, Search, Sparkles, Command, Mic, LogOut,
-  CalendarClock, PanelLeftClose, PanelLeftOpen,
+  CalendarClock, PanelLeftClose, PanelLeftOpen, Settings2,
 } from 'lucide-react'
 import { AskRelay } from './AskRelay'
 import { LogCall } from './LogCall'
@@ -48,6 +48,7 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/capture', label: 'Capture', icon: Inbox, badge: unreviewed },
     { to: '/relationships', label: 'Warm paths', icon: Waypoints, badge: 0 },
     { to: '/accounts', label: 'Accounts', icon: Building2, badge: 0 },
+    { to: '/admin', label: 'Admin', icon: Settings2, badge: 0 },
   ]
 
   return (

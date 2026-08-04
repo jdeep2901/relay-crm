@@ -8,6 +8,7 @@ import { Capture } from './views/Capture'
 import { Precall } from './views/Precall'
 import { Relationships } from './views/Relationships'
 import { Accounts } from './views/Accounts'
+import { Admin } from './views/Admin'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/capture" element={<Capture />} />
             <Route path="/relationships" element={<Relationships />} />
             <Route path="/accounts" element={<Accounts />} />
+            <Route path="/admin" element={<Admin />} />
           </Routes>
         </Shell>
       </HashRouter>
