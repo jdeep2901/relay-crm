@@ -1,26 +1,18 @@
 import { useState } from 'react'
 import {
-  Home, Kanban, Inbox, Flame, Building2,
-  Check, Pencil, X, User, Sparkles, Link2, Mic,
+  Kanban, Inbox, Flame, Building2,
+  Check, Pencil, X, User, Sparkles, Link2,
 } from 'lucide-react'
 import { Card, Pill } from '../components/ui'
 
 const BASE = import.meta.env.BASE_URL
 
 type Section = {
-  key: string; label: string; icon: typeof Home; shot?: string
+  key: string; label: string; icon: typeof Kanban; shot?: string
   what: string; how: { t: string; d: string }[]
 }
 
 const SECTIONS: Section[] = [
-  {
-    key: 'today', label: 'Today', icon: Home, shot: 'today.png',
-    what: 'Your morning pass. What is happening this week and what is waiting on you.',
-    how: [
-      { t: 'Meetings this week', d: 'Every upcoming call, with a green flag when Relay has already prepared a brief for it.' },
-      { t: 'Waiting in Capture', d: 'Calls that have been tagged and need a human to confirm. Click through to review them.' },
-    ],
-  },
   {
     key: 'priority', label: 'Priority', icon: Flame,
     what: 'Where to spend attention, ranked on what clients actually said — not on stage.',
@@ -102,7 +94,6 @@ export function Guide() {
             { i: User, c: 'var(--status-green)', t: 'client · name', d: 'The client said this. Treat as fact.' },
             { i: Building2, c: 'var(--status-amber)', t: 'MathCo said this', d: 'We said it and the client never confirmed. Confirm only if you know it is true.' },
             { i: Link2, c: 'var(--accent)', t: 'Change deal', d: 'Moves this one call to a different deal. Other calls in the thread stay put.' },
-            { i: Mic, c: 'var(--accent)', t: 'Log a call', d: 'For a 1-1 with no notetaker: paste your notes and Relay extracts the fields.' },
           ].map((r) => (
             <div key={r.t} className="flex items-start gap-2.5">
               <r.i size={14} style={{ color: r.c }} className="mt-0.5 shrink-0" />

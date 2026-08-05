@@ -1,7 +1,6 @@
-import { HashRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { AuthGate } from './components/AuthGate'
-import { Today } from './views/Today'
 import { Pipeline } from './views/Pipeline'
 import { DealDetail } from './views/DealDetail'
 import { Capture } from './views/Capture'
@@ -18,7 +17,7 @@ export default function App() {
       <HashRouter>
         <Shell>
           <Routes>
-            <Route path="/" element={<Today />} />
+            <Route path="/" element={<Navigate to="/priority" replace />} />
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/precall" element={<Precall />} />
             <Route path="/deal/:id" element={<DealDetail />} />
