@@ -2,18 +2,31 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Download, RefreshCw, Gauge, Loader2, Check, CircleAlert, Sparkles, Clock, Terminal,
+  Users, UserPlus, Trash2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { Card, Pill, Loading } from '../components/ui'
 
 type Status = {
-  counts: { pending: number; extracted: number; internal: number; unreviewed: number; deals: number; linked: number }
+  counts: { pending: number; extracted: number; internal: number; unreviewed: number; deals: number; linked: number; needsConfirm?: number }
   runs: { job: string; status: string; detail: Record<string, unknown> | null; triggered_by: string; started_at: string; finished_at: string | null }[]
+  isOwner?: boolean
+  who?: string
 }
+type RelayUser = { login: string; name: string; created_at: string; last_sign_in_at: string | null }
 
 async function callAdmin(action: string) {
   const { data, error } = await supabase.functions.invoke(`relay-admin?action=${action}`, { method: 'GET' })
   if (error) throw error
+  return data
+}
+async function postAdmin(action: string, body: Record<string, string>) {
+  const { data, error } = await supabase.functions.invoke(`relay-admin?action=${action}`, { method: 'POST', body })
+  if (error) {
+    // surface the function's own error message rather than a generic 400
+    const msg = await (error as { context?: Response }).context?.json?.().then((j: { error?: string }) => j?.error).catch(() => null)
+    throw new Error(msg || error.message)
+  }
   return data
 }
 
@@ -126,6 +139,9 @@ export function Admin() {
         )}
       </div>
 
+      {/* users */}
+      {data?.isOwner && <UsersPanel />}
+
       {/* recent runs */}
       <div className="text-[11px] text-secondary mb-2">Recent runs</div>
       <Card className="p-0 overflow-hidden">
@@ -143,6 +159,127 @@ export function Admin() {
               <Clock size={10} />{new Date(r.started_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </span>
             <span className="text-[10px] text-tertiary shrink-0 w-[110px] truncate text-right">{r.triggered_by}</span>
+          </div>
+        ))}
+      </Card>
+    </div>
+  )
+}
+
+function UsersPanel() {
+  const { data, refetch, isLoading } = useQuery<{ users: RelayUser[] }>({
+    queryKey: ['admin-users'], queryFn: () => callAdmin('list-users'),
+  })
+  const [login, setLogin] = useState('')
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [resetFor, setResetFor] = useState<string | null>(null)
+  const [newPw, setNewPw] = useState('')
+
+  const add = async () => {
+    if (!login.trim() || password.length < 6) {
+      setMsg({ text: 'Login is required and the password must be at least 6 characters.', ok: false }); return
+    }
+    setBusy(true); setMsg(null)
+    try {
+      await postAdmin('create-user', { login: login.trim().toLowerCase(), password, name: name.trim() })
+      setMsg({ text: `Created “${login.trim().toLowerCase()}”. They can sign in now with the password you set.`, ok: true })
+      setLogin(''); setName(''); setPassword(''); refetch()
+    } catch (e) { setMsg({ text: String((e as Error).message), ok: false }) } finally { setBusy(false) }
+  }
+  const reset = async (who: string) => {
+    if (newPw.length < 6) { setMsg({ text: 'Password must be at least 6 characters.', ok: false }); return }
+    setBusy(true); setMsg(null)
+    try {
+      await postAdmin('set-password', { login: who, password: newPw })
+      setMsg({ text: `Password updated for “${who}”.`, ok: true }); setResetFor(null); setNewPw('')
+    } catch (e) { setMsg({ text: String((e as Error).message), ok: false }) } finally { setBusy(false) }
+  }
+  const remove = async (who: string) => {
+    setBusy(true); setMsg(null)
+    try {
+      await postAdmin('delete-user', { login: who })
+      setMsg({ text: `Removed “${who}”.`, ok: true }); refetch()
+    } catch (e) { setMsg({ text: String((e as Error).message), ok: false }) } finally { setBusy(false) }
+  }
+
+  const input = 'hairline rounded-md px-2.5 py-1.5 text-[12px] bg-card outline-none focus:border-[var(--accent)]'
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center gap-2 mb-2">
+        <Users size={14} className="text-accent" />
+        <span className="text-[13px] font-medium">Users</span>
+        <span className="text-[11px] text-tertiary">{data?.users?.length ?? 0}</span>
+      </div>
+
+      <Card className="p-4 mb-2">
+        <div className="text-[11px] text-secondary mb-2">Add a user</div>
+        <div className="flex items-end gap-2 flex-wrap">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] text-tertiary">Login</span>
+            <input className={input} style={{ width: 140 }} placeholder="e.g. sahana"
+              value={login} onChange={(e) => setLogin(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] text-tertiary">Display name</span>
+            <input className={input} style={{ width: 160 }} placeholder="Sahana Sreeja"
+              value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] text-tertiary">Password</span>
+            <input className={input} style={{ width: 160 }} placeholder="min 6 characters" type="text"
+              value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+          <button onClick={add} disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent text-white px-3 py-1.5 text-[12px] hover:brightness-110 disabled:opacity-50">
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} Add user
+          </button>
+        </div>
+        <div className="text-[10.5px] text-tertiary mt-2">
+          Logins are plain names (no email needed). Everyone sees all Relay data — there are no per-user restrictions yet.
+        </div>
+      </Card>
+
+      {msg && (
+        <div className={`rounded-md p-2.5 mb-2 text-[12px] flex items-start gap-2 ${msg.ok ? 'bg-[var(--status-green-bg)]' : 'bg-[var(--status-red-bg)]'}`}>
+          {msg.ok ? <Check size={13} className="text-green-text mt-0.5 shrink-0" /> : <CircleAlert size={13} className="text-red-text mt-0.5 shrink-0" />}
+          <span style={{ color: msg.ok ? 'var(--status-green-text)' : 'var(--status-red-text)' }}>{msg.text}</span>
+        </div>
+      )}
+
+      <Card className="p-0 overflow-hidden">
+        {isLoading && <div className="p-4 text-[12px] text-tertiary">Loading…</div>}
+        {(data?.users ?? []).map((u, i) => (
+          <div key={u.login} className="px-4 py-2.5" style={{ borderTop: i ? '0.5px solid var(--border-hairline)' : 'none' }}>
+            <div className="flex items-center gap-3">
+              <span className="text-[12.5px] font-medium w-[150px] shrink-0">{u.login}</span>
+              <span className="text-[11.5px] text-secondary flex-1 truncate">{u.name}</span>
+              <span className="text-[11px] text-tertiary shrink-0">
+                {u.last_sign_in_at
+                  ? `last in ${new Date(u.last_sign_in_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : 'never signed in'}
+              </span>
+              <button onClick={() => { setResetFor(resetFor === u.login ? null : u.login); setNewPw('') }}
+                className="text-[11px] text-accent hover:underline shrink-0">reset password</button>
+              {!u.login.includes('@') && (
+                <button onClick={() => remove(u.login)} disabled={busy}
+                  className="text-tertiary hover:text-red-text shrink-0" title="Remove user">
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+            {resetFor === u.login && (
+              <div className="flex items-center gap-2 mt-2 pl-[150px]">
+                <input className={input} style={{ width: 180 }} placeholder="new password" type="text"
+                  value={newPw} onChange={(e) => setNewPw(e.target.value)} autoFocus />
+                <button onClick={() => reset(u.login)} disabled={busy}
+                  className="rounded-md bg-accent text-white px-2.5 py-1 text-[11px] hover:brightness-110">Save</button>
+                <button onClick={() => setResetFor(null)} className="text-[11px] text-secondary">Cancel</button>
+              </div>
+            )}
           </div>
         ))}
       </Card>
