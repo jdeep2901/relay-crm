@@ -9,6 +9,8 @@ import { Precall } from './views/Precall'
 import { Relationships } from './views/Relationships'
 import { Accounts } from './views/Accounts'
 import { Admin } from './views/Admin'
+import { Priority } from './views/Priority'
+import { Guide } from './views/Guide'
 
 export default function App() {
   return (
@@ -23,6 +25,8 @@ export default function App() {
             <Route path="/capture" element={<Capture />} />
             <Route path="/relationships" element={<Relationships />} />
             <Route path="/accounts" element={<Accounts />} />
+            <Route path="/priority" element={<Priority />} />
+            <Route path="/guide" element={<Guide />} />
             <Route path="/admin" element={<Admin />} />
           </Routes>
         </Shell>
