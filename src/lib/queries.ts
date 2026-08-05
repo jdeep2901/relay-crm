@@ -141,6 +141,7 @@ interface CaptureRow {
 interface SuggRow {
   id: string; capture_id: string; field: string; value: string | null; quote: string | null
   owner: Owner; status: 'pending' | 'accepted' | 'rejected'; position: number; confidence: number | null
+  speaker: string | null; speaker_side: 'client' | 'mathco' | 'unclear' | null; unconfirmed: boolean | null
 }
 
 async function fetchCaptures(): Promise<CaptureItem[]> {
@@ -175,6 +176,9 @@ async function fetchCaptures(): Promise<CaptureItem[]> {
     extracted: (byCap.get(c.id) ?? []).map((s) => ({
       id: s.id, field: s.field, value: s.value ?? '', quote: s.quote ?? '',
       owner: s.owner, status: s.status, confidence: Number(s.confidence ?? 0.9),
+      speaker: s.speaker ?? undefined,
+      speakerSide: s.speaker_side ?? undefined,
+      unconfirmed: !!s.unconfirmed,
     })),
     proposedNextStep: c.proposed_next_step ?? '',
     proposedStageMove:

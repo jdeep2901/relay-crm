@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Mic, Mail, Check, Sparkles, ArrowRight, CircleAlert, Clock, CheckCheck, Loader2,
   Pencil, X, RotateCcw, ShieldCheck, Search as SearchIcon, Link2, Unlink,
+  User, Building2, HelpCircle,
 } from 'lucide-react'
 import { useCaptures, useAcceptCapture, useReviewSuggestion, useReassignCapture, useDeals } from '../lib/queries'
 import { shortDate } from '../lib/format'
@@ -144,6 +145,7 @@ function ReviewPanel({ item }: { item: CaptureItem }) {
   const navigate = useNavigate()
   const acceptCapture = useAcceptCapture()
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all')
+  const [onlyUnconfirmed, setOnlyUnconfirmed] = useState(false)
 
   const counts = useMemo(() => {
     const total = item.extracted.length
@@ -151,7 +153,12 @@ function ReviewPanel({ item }: { item: CaptureItem }) {
     return { total, pending, done: total - pending }
   }, [item.extracted])
 
-  const shown = item.extracted.filter((f) => ownerFilter === 'all' || f.owner === ownerFilter)
+  const needsConfirm = (f: CaptureItem['extracted'][number]) =>
+    f.speakerSide === 'mathco' || f.speakerSide === 'unclear' || f.unconfirmed
+  const shown = item.extracted
+    .filter((f) => ownerFilter === 'all' || f.owner === ownerFilter)
+    .filter((f) => !onlyUnconfirmed || needsConfirm(f))
+  const unconfirmedCount = item.extracted.filter(needsConfirm).length
   const OWNERS: { k: OwnerFilter; label: string }[] = [
     { k: 'all', label: 'All' }, { k: 'solutioning', label: 'Solutioning' },
     { k: 'sales', label: 'Sales' }, { k: 'jd-sahana', label: 'JD + Sahana' },
@@ -203,6 +210,18 @@ function ReviewPanel({ item }: { item: CaptureItem }) {
             </button>
           ))}
         </div>
+        {unconfirmedCount > 0 && (
+          <button
+            onClick={() => setOnlyUnconfirmed((v) => !v)}
+            className={`px-2 py-0.5 text-[11px] rounded-md inline-flex items-center gap-1 transition-colors ${
+              onlyUnconfirmed ? 'bg-[var(--status-amber-bg)] text-amber-text font-medium' : 'text-secondary hover:bg-hover'
+            }`}
+            title="Fields we said, or where the speaker is unclear — confirm or dismiss"
+          >
+            <Building2 size={10} /> Needs confirming
+            <span className="num">{unconfirmedCount}</span>
+          </button>
+        )}
         <span className="ml-auto text-[11px] text-tertiary num">{counts.done}/{counts.total} reviewed</span>
       </div>
 
@@ -346,10 +365,23 @@ function SuggestionRow({ f, item }: { f: CaptureItem['extracted'][number]; item:
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[11px] text-secondary shrink-0">{f.field}</span>
           <Pill tone={OWNER_TONE[f.owner]}>{OWNER_LABEL[f.owner]}</Pill>
+          {/* who said it — the attribution that decides whether this is client fact */}
+          {f.speakerSide === 'client' ? (
+            <Pill tone="green" icon={<User size={9} />}>
+              client{f.speaker ? ` · ${f.speaker.split(',')[0].split(' ').slice(0, 2).join(' ')}` : ''}
+            </Pill>
+          ) : f.speakerSide === 'mathco' ? (
+            <Pill tone="amber" icon={<Building2 size={9} />}>
+              MathCo said this{f.speaker ? ` · ${f.speaker.split(' ')[0]}` : ''}
+            </Pill>
+          ) : f.speakerSide === 'unclear' ? (
+            <Pill tone="neutral" icon={<HelpCircle size={9} />}>unclear speaker</Pill>
+          ) : null}
+          {f.unconfirmed && <Pill tone="red">unconfirmed</Pill>}
           {/* confidence indicator */}
           {high
-            ? <Pill tone="green"><span className="num">{Math.round(f.confidence * 100)}%</span> high</Pill>
-            : <Pill tone="amber"><span className="num">{Math.round(f.confidence * 100)}%</span> review</Pill>}
+            ? <Pill tone="green"><span className="num">{Math.round(f.confidence * 100)}%</span></Pill>
+            : <Pill tone="amber"><span className="num">{Math.round(f.confidence * 100)}%</span></Pill>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {review.isPending ? (

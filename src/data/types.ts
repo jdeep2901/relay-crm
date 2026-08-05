@@ -132,6 +132,9 @@ export interface CaptureItem {
     owner: Owner
     status: 'pending' | 'accepted' | 'rejected'
     confidence: number
+    speaker?: string                                   // who said the quote
+    speakerSide?: 'client' | 'mathco' | 'unclear'      // whose side they're on
+    unconfirmed?: boolean                              // asserted but never client-confirmed
   }[]
   proposedNextStep: string
   proposedStageMove?: { from: Stage; to: Stage }
