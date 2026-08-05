@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Home, Kanban, CalendarClock, Inbox, Flame, Building2, Waypoints, Settings2,
+  Home, Kanban, Inbox, Flame, Building2,
   Check, Pencil, X, User, Sparkles, Link2, Mic,
 } from 'lucide-react'
 import { Card, Pill } from '../components/ui'
@@ -38,15 +38,6 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    key: 'precall', label: 'Pre-call', icon: CalendarClock, shot: 'precall.png',
-    what: 'Research and discovery questions prepared for every upcoming meeting.',
-    how: [
-      { t: 'The way in', d: 'The recommended angle for the conversation, based on what is happening at the company.' },
-      { t: 'Smart questions', d: 'Non-pitchy questions designed to get the prospect talking about their priorities.' },
-      { t: 'Watch-outs', d: 'Things not to say, and facts to verify before you quote them.' },
-    ],
-  },
-  {
     key: 'capture', label: 'Capture', icon: Inbox, shot: 'capture.png',
     what: 'Every call, already tagged. This is where your review work happens.',
     how: [
@@ -64,20 +55,6 @@ const SECTIONS: Section[] = [
       { t: 'Every field cites its source', d: 'Click the provenance chip to see the sentence from the call that produced it.' },
       { t: 'Propensity', d: 'Stage baseline from historical conversion, adjusted by budget identified and specific area need.' },
       { t: 'Calls', d: 'The full thread for this deal in order, so you can see how the conversation developed.' },
-    ],
-  },
-  {
-    key: 'warm', label: 'Warm paths', icon: Waypoints,
-    what: 'Who inside MathCo can make a warm introduction into an account.',
-    how: [{ t: 'Use before cold outreach', d: 'A referral path converts far better than a cold approach.' }],
-  },
-  {
-    key: 'admin', label: 'Admin', icon: Settings2,
-    what: 'Run the pipeline on demand and manage users. Owner only for user management.',
-    how: [
-      { t: 'Pull transcripts', d: 'Fetches new calls from GoodMeetings. Also runs automatically every day.' },
-      { t: 'Sync deals from Monday', d: 'Refreshes the deal list so new Monday deals appear in the linkage dropdown.' },
-      { t: 'Recompute propensity', d: 'Re-applies the scoring after criteria have been confirmed.' },
     ],
   },
 ]

@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  Home, Kanban, Inbox, Waypoints, Building2, Search, Sparkles, Command, Mic, LogOut,
-  CalendarClock, PanelLeftClose, PanelLeftOpen, Settings2, Flame, BookOpen,
+  Home, Kanban, Inbox, Search, Sparkles, Command, Mic, LogOut,
+  PanelLeftClose, PanelLeftOpen, Settings2, Flame, BookOpen,
 } from 'lucide-react'
 import { AskRelay } from './AskRelay'
 import { LogCall } from './LogCall'
@@ -16,7 +16,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [logOpen, setLogOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('relay-nav-collapsed') === '1')
   const location = useLocation()
-  const { userName, signOut } = useAuth()
+  const { userName, signOut, session } = useAuth()
   const { data: captures } = useCaptures()
   const { data: deals } = useDeals()
   const unreviewed = captures?.filter((c) => !c.reviewed).length ?? 0
@@ -41,16 +41,18 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Only surface screens that are live and part of the workflow.
+  // Routes for hidden screens still resolve by URL — they're just off the nav.
+  const isOwner = ['allam.jaideep@gmail.com', 'jaideep', 'jd'].includes(
+    (session?.user?.email ?? '').toLowerCase(),
+  )
   const nav = [
     { to: '/', label: 'Today', icon: Home, end: true, badge: 0 },
-    { to: '/pipeline', label: 'Pipeline', icon: Kanban, badge: 0 },
-    { to: '/precall', label: 'Pre-call', icon: CalendarClock, badge: upcoming },
     { to: '/priority', label: 'Priority', icon: Flame, badge: 0 },
     { to: '/capture', label: 'Capture', icon: Inbox, badge: unreviewed },
-    { to: '/relationships', label: 'Warm paths', icon: Waypoints, badge: 0 },
-    { to: '/accounts', label: 'Accounts', icon: Building2, badge: 0 },
+    { to: '/pipeline', label: 'Pipeline', icon: Kanban, badge: 0 },
     { to: '/guide', label: 'User guide', icon: BookOpen, badge: 0 },
-    { to: '/admin', label: 'Admin', icon: Settings2, badge: 0 },
+    ...(isOwner ? [{ to: '/admin', label: 'Admin', icon: Settings2, badge: 0 }] : []),
   ]
 
   return (
